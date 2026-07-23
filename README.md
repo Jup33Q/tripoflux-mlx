@@ -38,6 +38,32 @@ prompt ──► FLUX.2-klein-9B (MLX) ──► RGB image
   - ✅ `LatentSeqMMFlowModel` flow transformer (`tripoflux/models/flow_mlx.py`)
   - ⏳ `OctreeGaussianDecoder` (remains on PyTorch MPS; complex dynamic sampling)
 
+## TODO
+
+### Completed
+- [x] FLUX.2-klein-9B MLX inference via mflux
+- [x] BiRefNet background removal (MLX/CoreML/MPS fallback)
+- [x] TripoSplat MLX ports: DinoV3ViT, Flux2VAEEncoder, LatentSeqMMFlowModel
+- [x] Hybrid MLX/MPS TripoSplat pipeline
+- [x] FastAPI backend with SSE progress streaming
+- [x] Web UI with Three.js splat viewer + OrbitControls
+- [x] SPZ export support (Niantic compressed splat format)
+- [x] SAM3 background removal via mlx-vlm
+- [x] mflux PR #481: Support mlx 0.32.x
+
+### In Progress
+- [ ] OctreeGaussianDecoder full MLX port (dynamic sampling logic)
+- [ ] BiRefNet native MLX port (Swin-L + deformable ASPP)
+- [ ] mlx-community submission for TripoSplat MLX weights
+
+### Planned
+- [ ] CoreML conversion for static encoders (DinoV3, VAE)
+- [ ] LoRA fine-tuning support for FLUX.2
+- [ ] Batch generation API
+- [ ] WebUI with real-time preview (streaming intermediate latents)
+- [ ] iOS / iPadOS app via MLX Swift
+- [ ] 4-bit quantized TripoSplat weights
+
 ## Requirements
 
 - macOS 14+ on Apple Silicon (M1/M2/M3/M4)
