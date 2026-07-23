@@ -142,11 +142,13 @@ class TripoSplatHybridPipeline:
         sample = noise
         t_seq = shift * np.linspace(1, 0, steps + 1) / (1 + (shift - 1) * np.linspace(1, 0, steps + 1))
         t_pairs = list(zip(t_seq[:-1], t_seq[1:]))
-        if show_progress:
-            from tqdm import tqdm
-            t_pairs = tqdm(t_pairs, desc="MLX Sampling", total=steps)
 
-        for i, (t, t_prev) in enumerate(t_pairs):
+        # tqdm drives both the terminal display and the external callback,
+        # so server log and web UI see the same sampler progress.
+        from tqdm.auto import tqdm
+        iterator = tqdm(t_pairs, desc="TripoSplat Sampling", total=steps)
+
+        for t, t_prev in iterator:
             x_t = {k: v for k, v in sample.items()}
             t_scaled = mx.array([1000 * t], dtype=mx.float32)
             pred_v = self._flow_mlx(x_t, t_scaled, cond)
@@ -162,7 +164,7 @@ class TripoSplatHybridPipeline:
             # callbacks would all fire up-front without real compute behind them.
             mx.eval(*sample.values())
             if callback is not None:
-                callback(i + 1, steps)
+                callback(iterator.n, steps)
 
         return sample
 
