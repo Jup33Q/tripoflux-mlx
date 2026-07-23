@@ -1,7 +1,7 @@
 """BiRefNet background removal with MLX-first routing.
 
 This module provides a unified background-removal interface that prefers an
-MLX implementation (SAM3), falling back to CoreML and then PyTorch MPS.
+MLX implementation (SAM3 or DA2), falling back to CoreML and then PyTorch MPS.
 """
 
 from __future__ import annotations
@@ -13,6 +13,7 @@ from typing import Optional, Union
 from PIL import Image
 
 from .birefnet_coreml import BiRefNetCoreML
+from .birefnet_da2 import DA2BackgroundRemover
 from .birefnet_sam3 import SAM3BackgroundRemover
 
 logger = logging.getLogger(__name__)
@@ -22,7 +23,8 @@ class BiRefNetMLX:
     """MLX-first BiRefNet background remover.
 
     Backend priority:
-    - ``mlx``: SAM3 via mlx-vlm → CoreML → PyTorch MPS
+    - ``mlx``: SAM3 via mlx-vlm → DA2 → CoreML → PyTorch MPS
+    - ``da2``: DA2 depth-based removal → CoreML → PyTorch MPS
     - ``coreml``: CoreML → PyTorch MPS
     - ``mps``: PyTorch MPS only
     """
@@ -33,11 +35,13 @@ class BiRefNetMLX:
         backend: str = "mlx",
         device: str = "mps",
         sam3_model: Optional[str] = None,
+        da2_model: Optional[str] = None,
     ):
         self.triposplat_dir = Path(triposplat_dir)
         self.backend = backend
         self.device = device
         self._sam3: Optional[SAM3BackgroundRemover] = None
+        self._da2: Optional[DA2BackgroundRemover] = None
         self._coreml = BiRefNetCoreML(
             coreml_path=self.triposplat_dir / "birefnet.mlpackage",
             fallback_torch_path=self.triposplat_dir / "background_removal" / "birefnet.safetensors",
@@ -50,6 +54,16 @@ class BiRefNetMLX:
             except Exception as exc:
                 logger.warning("SAM3 init failed, will use fallback: %s", exc)
                 self._sam3 = None
+        if backend in ("mlx", "da2"):
+            try:
+                self._da2 = DA2BackgroundRemover(
+                    model_name=da2_model or "depth-anything/Depth-Anything-V2-Base",
+                    device=device,
+                )
+                logger.info("DA2 background remover initialized")
+            except Exception as exc:
+                logger.warning("DA2 init failed, will use fallback: %s", exc)
+                self._da2 = None
 
     def remove_background(self, image: Image.Image) -> Image.Image:
         """Remove the background and return an RGBA image."""
@@ -58,6 +72,11 @@ class BiRefNetMLX:
                 return self._sam3.remove_background(image)
             except Exception as exc:
                 logger.warning("SAM3 inference failed, falling back: %s", exc)
+        if self.backend in ("mlx", "da2") and self._da2 is not None:
+            try:
+                return self._da2.remove_background(image)
+            except Exception as exc:
+                logger.warning("DA2 inference failed, falling back: %s", exc)
         return self._coreml.remove_background(image)
 
     @property
@@ -65,6 +84,8 @@ class BiRefNetMLX:
         if self.backend == "mlx":
             if self._sam3 is not None:
                 return "mlx(sam3)"
+            if self._da2 is not None:
+                return "mlx(da2)"
             return "mlx(fallback:coreml/mps)"
         return self.backend
 
@@ -74,10 +95,12 @@ def create_birefnet_remover(
     backend: str = "mlx",
     device: str = "mps",
     sam3_model: Optional[str] = None,
+    da2_model: Optional[str] = None,
 ) -> BiRefNetMLX:
     return BiRefNetMLX(
         triposplat_dir=triposplat_dir,
         backend=backend,
         device=device,
         sam3_model=sam3_model,
+        da2_model=da2_model,
     )

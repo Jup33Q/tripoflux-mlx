@@ -55,13 +55,13 @@ prompt ──► FLUX.2-klein-9B (MLX) ──► RGB image
 - [ ] OctreeGaussianDecoder full MLX port (dynamic sampling logic)
 - [ ] BiRefNet native MLX port (Swin-L + deformable ASPP)
 - [ ] mlx-community submission for TripoSplat MLX weights
+- [ ] DA2 (Depth Anything V2) background removal alternative
 
 ### Planned
 - [ ] CoreML conversion for static encoders (DinoV3, VAE)
-- [ ] LoRA fine-tuning support for FLUX.2
 - [ ] Batch generation API
 - [ ] WebUI with real-time preview (streaming intermediate latents)
-- [ ] iOS / iPadOS app via MLX Swift
+- [ ] macOS Swift app deployment (MLX Swift)
 - [ ] 4-bit quantized TripoSplat weights
 
 ## Requirements
