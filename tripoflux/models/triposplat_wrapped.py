@@ -79,8 +79,12 @@ class TripoSplatGenerator:
         image: Image.Image,
         cfg: SplatGenerationConfig = None,
         show_progress: bool = False,
+        callback=None,
     ) -> Tuple[bytes, bytes, bytes, Image.Image]:
         """Convert an RGBA image to Gaussian Splat bytes.
+
+        Args:
+            callback: Optional ``fn(step, total)`` invoked after each sampler step.
 
         Returns:
             (ply_bytes, splat_bytes, spz_bytes, prepared_image)
@@ -93,6 +97,7 @@ class TripoSplatGenerator:
                 image,
                 cfg=cfg,
                 show_progress=show_progress,
+                callback=callback,
             )
         else:
             gaussian, prepared = self._pipeline.run(
@@ -104,6 +109,7 @@ class TripoSplatGenerator:
                 num_gaussians=cfg.num_gaussians,
                 erode_radius=cfg.erode_radius,
                 show_progress=show_progress,
+                callback=callback,
             )
             ply_bytes = gaussian.to_ply_bytes()
             splat_bytes = gaussian.to_splat_bytes()

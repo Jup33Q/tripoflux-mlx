@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import io
 import json
 import logging
 import os
+import threading
 import uuid
 from pathlib import Path
 from typing import AsyncGenerator, Optional
@@ -211,86 +213,118 @@ async def stream(job_id: str) -> StreamingResponse:
         job["stage"] = "starting"
         job["log"] = []
 
-        def on_progress(stage: str, frac: float) -> None:
-            job["stage"] = stage
-            job["progress"] = frac
+        loop = asyncio.get_running_loop()
+        queue: asyncio.Queue = asyncio.Queue()
+        _DONE = object()
 
-        def log(msg: str) -> None:
-            job["log"].append(msg)
-            return msg
+        # Overall-progress span of each stage: (start, end)
+        STAGE_SPAN = {"flux": (0.0, 0.45), "birefnet": (0.45, 0.55), "triposplat": (0.55, 1.0)}
+
+        def emit(payload: dict) -> None:
+            if "stage" in payload:
+                job["stage"] = payload["stage"]
+            if "progress" in payload:
+                job["progress"] = payload["progress"]
+            loop.call_soon_threadsafe(queue.put_nowait, payload)
+
+        def on_progress(stage: str, frac: float) -> None:
+            lo, hi = STAGE_SPAN.get(stage, (0.0, 1.0))
+            overall = lo + (hi - lo) * frac
+            emit({
+                "status": "running",
+                "stage": stage,
+                "stage_progress": round(frac, 4),
+                "progress": round(overall, 4),
+            })
+
+        def run_job() -> None:
+            try:
+                pipeline = get_pipeline()
+
+                # Stage 1: FLUX image generation
+                emit({"status": "running", "stage": "flux", "stage_progress": 0.0,
+                      "progress": 0.0, "log": "Generating image with FLUX.2-klein-9B..."})
+                image = pipeline.generate_image(
+                    prompt=req["prompt"],
+                    seed=req.get("seed"),
+                    width=req.get("width"),
+                    height=req.get("height"),
+                    flux_quantize=req.get("flux_quantize"),
+                    negative_prompt=req.get("negative_prompt"),
+                    progress=on_progress,
+                )
+                job["flux_image"] = image
+                emit({"status": "running", "stage": "flux", "stage_progress": 1.0,
+                      "progress": STAGE_SPAN["flux"][1], "log": "Image generated",
+                      "image_ready": "flux"})
+
+                # Stage 2: BiRefNet background removal
+                emit({"status": "running", "stage": "birefnet", "stage_progress": 0.0,
+                      "progress": STAGE_SPAN["birefnet"][0],
+                      "log": "Removing background with BiRefNet..."})
+                rgba = pipeline.remove_background(image, progress=on_progress)
+                job["rgba_image"] = rgba
+                emit({"status": "running", "stage": "birefnet", "stage_progress": 1.0,
+                      "progress": STAGE_SPAN["birefnet"][1], "log": "Background removed",
+                      "image_ready": "rgba"})
+
+                # Stage 3: TripoSplat generation
+                emit({"status": "running", "stage": "triposplat", "stage_progress": 0.0,
+                      "progress": STAGE_SPAN["triposplat"][0],
+                      "log": "Generating 3D Gaussian Splat..."})
+                ply, splat, spz, prepared = pipeline.generate_splat(
+                    rgba,
+                    num_gaussians=req.get("num_gaussians"),
+                    seed=req.get("seed"),
+                    progress=on_progress,
+                )
+
+                from .pipeline import PipelineResult
+                result = PipelineResult(
+                    prompt=req["prompt"],
+                    generated_image=image,
+                    rgba_image=rgba,
+                    prepared_image=prepared,
+                    ply_bytes=ply,
+                    splat_bytes=splat,
+                    spz_bytes=spz,
+                    metadata={
+                        "seed": req.get("seed") or pipeline.cfg.seed,
+                        "width": req.get("width") or pipeline.cfg.image_width,
+                        "height": req.get("height") or pipeline.cfg.image_height,
+                        "num_gaussians": req.get("num_gaussians") or pipeline.cfg.num_gaussians,
+                        "flux_quantize": req.get("flux_quantize") or pipeline.cfg.flux_quantize,
+                        "negative_prompt": req.get("negative_prompt"),
+                        "flux_backend": pipeline.cfg.flux_backend,
+                        "birefnet_backend": pipeline.cfg.birefnet_backend,
+                        "triposplat_backend": pipeline.cfg.triposplat_backend,
+                    },
+                )
+                job["result"] = result
+                job["status"] = "completed"
+                job["progress"] = 1.0
+                job["stage"] = "done"
+                emit({"status": "completed", "stage": "done", "stage_progress": 1.0,
+                      "progress": 1.0, "log": "All done!"})
+            except Exception as exc:  # pragma: no cover
+                logger.exception("job %s failed", job_id)
+                job["status"] = "failed"
+                job["error"] = str(exc)
+                emit({"status": "failed", "error": str(exc), "log": f"Error: {exc}"})
+            finally:
+                loop.call_soon_threadsafe(queue.put_nowait, _DONE)
+
+        worker = threading.Thread(target=run_job, name=f"job-{job_id[:8]}", daemon=True)
 
         # Send immediate started event so the frontend knows the stream is alive.
         yield f"data: {json.dumps({'status': 'running', 'progress': 0.0, 'stage': 'starting', 'log': 'Job started'})}\n\n"
+        worker.start()
 
-        try:
-            pipeline = get_pipeline()
-
-            # Stage 1: FLUX image generation
-            job["stage"] = "flux"
-            job["progress"] = 0.05
-            yield f"data: {json.dumps({'status': 'running', 'progress': 0.05, 'stage': 'flux', 'log': 'Generating image with FLUX.2-klein-9B...'})}\n\n"
-            image = pipeline.generate_image(
-                prompt=req["prompt"],
-                seed=req.get("seed"),
-                width=req.get("width"),
-                height=req.get("height"),
-                flux_quantize=req.get("flux_quantize"),
-                negative_prompt=req.get("negative_prompt"),
-            )
-            job["flux_image"] = image
-            job["progress"] = 0.33
-            yield f"data: {json.dumps({'status': 'running', 'progress': 0.33, 'stage': 'flux', 'log': 'Image generated', 'image_ready': 'flux'})}\n\n"
-
-            # Stage 2: BiRefNet background removal
-            job["stage"] = "birefnet"
-            yield f"data: {json.dumps({'status': 'running', 'progress': 0.34, 'stage': 'birefnet', 'log': 'Removing background with BiRefNet...'})}\n\n"
-            rgba = pipeline.remove_background(image)
-            job["rgba_image"] = rgba
-            job["progress"] = 0.66
-            yield f"data: {json.dumps({'status': 'running', 'progress': 0.66, 'stage': 'birefnet', 'log': 'Background removed', 'image_ready': 'rgba'})}\n\n"
-
-            # Stage 3: TripoSplat generation
-            job["stage"] = "triposplat"
-            yield f"data: {json.dumps({'status': 'running', 'progress': 0.67, 'stage': 'triposplat', 'log': 'Generating 3D Gaussian Splat...'})}\n\n"
-            ply, splat, spz, prepared = pipeline.generate_splat(
-                rgba,
-                num_gaussians=req.get("num_gaussians"),
-                seed=req.get("seed"),
-            )
-            job["progress"] = 0.95
-            yield f"data: {json.dumps({'status': 'running', 'progress': 0.95, 'stage': 'triposplat', 'log': 'Splat generated, preparing download...'})}\n\n"
-
-            from .pipeline import PipelineResult
-            result = PipelineResult(
-                prompt=req["prompt"],
-                generated_image=image,
-                rgba_image=rgba,
-                prepared_image=prepared,
-                ply_bytes=ply,
-                splat_bytes=splat,
-                spz_bytes=spz,
-                metadata={
-                    "seed": req.get("seed") or pipeline.cfg.seed,
-                    "width": req.get("width") or pipeline.cfg.image_width,
-                    "height": req.get("height") or pipeline.cfg.image_height,
-                    "num_gaussians": req.get("num_gaussians") or pipeline.cfg.num_gaussians,
-                    "flux_quantize": req.get("flux_quantize") or pipeline.cfg.flux_quantize,
-                    "negative_prompt": req.get("negative_prompt"),
-                    "flux_backend": pipeline.cfg.flux_backend,
-                    "birefnet_backend": pipeline.cfg.birefnet_backend,
-                    "triposplat_backend": pipeline.cfg.triposplat_backend,
-                },
-            )
-            job["result"] = result
-            job["status"] = "completed"
-            job["progress"] = 1.0
-            job["stage"] = "done"
-            yield f"data: {json.dumps({'status': 'completed', 'progress': 1.0, 'stage': 'done', 'log': 'All done!'})}\n\n"
-        except Exception as exc:  # pragma: no cover
-            logger.exception("job %s failed", job_id)
-            job["status"] = "failed"
-            job["error"] = str(exc)
-            yield f"data: {json.dumps({'status': 'failed', 'error': str(exc), 'log': f'Error: {exc}'})}\n\n"
+        while True:
+            item = await queue.get()
+            if item is _DONE:
+                break
+            yield f"data: {json.dumps(item)}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 

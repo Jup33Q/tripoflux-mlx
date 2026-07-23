@@ -20,11 +20,62 @@ import SplatViewer from '/frontend/splat-viewer.js';
   const splatCanvas = $("splatCanvas");
   const terminalEl = $("terminal");
 
+  const STAGE_ORDER = ["flux", "birefnet", "triposplat"];
+  const STAGE_LABELS = {
+    flux: "FLUX Image",
+    birefnet: "Background Removal",
+    triposplat: "TripoSplat 3D",
+  };
+  const STAGES = {
+    flux: { el: $("stageFlux"), fill: $("stageFluxFill"), pct: $("stageFluxPct"), indeterminate: false },
+    birefnet: { el: $("stageBirefnet"), fill: $("stageBirefnetFill"), pct: $("stageBirefnetPct"), indeterminate: true },
+    triposplat: { el: $("stageTriposplat"), fill: $("stageTriposplatFill"), pct: $("stageTriposplatPct"), indeterminate: false },
+  };
+
   let splatViewer = null;
 
   function setProgress(frac, stage) {
     progressBar.style.width = `${Math.round(frac * 100)}%`;
     progressText.textContent = `${stage} ${Math.round(frac * 100)}%`;
+  }
+
+  function setStageState(s, state, frac) {
+    s.el.dataset.state = state;
+    const f = Math.max(0, Math.min(1, frac || 0));
+    if (state === "done") {
+      s.fill.style.width = "100%";
+      s.pct.textContent = "100%";
+    } else {
+      s.fill.style.width = `${Math.round(f * 100)}%`;
+      s.pct.textContent = state === "active" ? `${Math.round(f * 100)}%` : "0%";
+    }
+    if (s.indeterminate && state === "active" && f < 1) {
+      s.el.setAttribute("data-indeterminate", "");
+    } else {
+      s.el.removeAttribute("data-indeterminate");
+    }
+  }
+
+  function resetStages() {
+    for (const key of STAGE_ORDER) {
+      setStageState(STAGES[key], "pending", 0);
+    }
+  }
+
+  function updateStages(stage, frac) {
+    const idx = STAGE_ORDER.indexOf(stage);
+    if (idx === -1) return;
+    STAGE_ORDER.forEach((key, i) => {
+      const s = STAGES[key];
+      if (i < idx) setStageState(s, "done", 1);
+      else if (i === idx) setStageState(s, "active", frac);
+    });
+  }
+
+  function finishStages() {
+    for (const key of STAGE_ORDER) {
+      setStageState(STAGES[key], "done", 1);
+    }
   }
 
   function setStatus(msg, isError = false) {
@@ -60,6 +111,7 @@ import SplatViewer from '/frontend/splat-viewer.js';
 
     generateBtn.disabled = true;
     resetOutputs();
+    resetStages();
     setProgress(0, "starting");
     setStatus("Submitting job...");
 
@@ -103,13 +155,18 @@ import SplatViewer from '/frontend/splat-viewer.js';
         }
         if (data.status === "completed") {
           setProgress(1, "done");
+          finishStages();
           setStatus("Completed");
           loadResults(job_id);
           evtSource.close();
           generateBtn.disabled = false;
           return;
         }
-        setProgress(data.progress || 0, data.stage || "running");
+        if (data.stage && STAGE_ORDER.includes(data.stage)) {
+          updateStages(data.stage, data.stage_progress || 0);
+        }
+        const label = STAGE_LABELS[data.stage] || data.stage || "running";
+        setProgress(data.progress || 0, label);
       };
       evtSource.onerror = () => {
         setStatus("Stream error / connection closed", true);

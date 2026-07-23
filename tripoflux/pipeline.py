@@ -87,7 +87,7 @@ class TripoFluxPipeline:
         negative_prompt: Optional[str] = None,
         progress: Optional[ProgressCallback] = None,
     ) -> Image.Image:
-        self._progress(progress, "flux", 0.05)
+        self._progress(progress, "flux", 0.0)
         flux = self.flux
         # If the caller requests a different quantization level, build a
         # temporary generator for this call. Model weights are reloaded
@@ -97,6 +97,10 @@ class TripoFluxPipeline:
                 backend=self.cfg.flux_backend,
                 quantize=flux_quantize,
             )
+
+        def on_step(step: int, total: int) -> None:
+            self._progress(progress, "flux", step / total if total else 0.0)
+
         img = flux.generate(
             FluxGenerationConfig(
                 prompt=prompt,
@@ -106,7 +110,8 @@ class TripoFluxPipeline:
                 guidance_scale=self.cfg.flux_guidance,
                 seed=seed if seed is not None else self.cfg.seed,
                 negative_prompt=negative_prompt,
-            )
+            ),
+            step_callback=on_step if progress is not None else None,
         )
         self._progress(progress, "flux", 1.0)
         return img
@@ -128,7 +133,11 @@ class TripoFluxPipeline:
         seed: Optional[int] = None,
         progress: Optional[ProgressCallback] = None,
     ) -> Tuple[bytes, bytes, bytes, Image.Image]:
-        self._progress(progress, "triposplat", 0.05)
+        self._progress(progress, "triposplat", 0.0)
+
+        def on_step(step: int, total: int) -> None:
+            self._progress(progress, "triposplat", step / total if total else 0.0)
+
         ply, splat, spz, prepared = self.triposplat.image_to_splat(
             rgba_image,
             cfg=SplatGenerationConfig(
@@ -138,6 +147,7 @@ class TripoFluxPipeline:
                 guidance_scale=self.cfg.splat_guidance,
                 shift=self.cfg.splat_shift,
             ),
+            callback=on_step if progress is not None else None,
         )
         self._progress(progress, "triposplat", 1.0)
         return ply, splat, spz, prepared

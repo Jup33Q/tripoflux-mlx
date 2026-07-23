@@ -126,6 +126,7 @@ class TripoSplatHybridPipeline:
         shift: float = 3.0,
         seed: int = 42,
         show_progress: bool = False,
+        callback=None,
     ) -> dict:
         """Run the Euler CFG sampler using the MLX flow model."""
         if self._flow_mlx is None:
@@ -145,7 +146,7 @@ class TripoSplatHybridPipeline:
             from tqdm import tqdm
             t_pairs = tqdm(t_pairs, desc="MLX Sampling", total=steps)
 
-        for t, t_prev in t_pairs:
+        for i, (t, t_prev) in enumerate(t_pairs):
             x_t = {k: v for k, v in sample.items()}
             t_scaled = mx.array([1000 * t], dtype=mx.float32)
             pred_v = self._flow_mlx(x_t, t_scaled, cond)
@@ -156,6 +157,12 @@ class TripoSplatHybridPipeline:
             dt = t - t_prev
             for key in sample:
                 sample[key] = sample[key] - pred_v[key] * dt
+            # MLX is lazily evaluated — without this the whole sampler graph
+            # would only materialize at the torch conversion, and progress
+            # callbacks would all fire up-front without real compute behind them.
+            mx.eval(*sample.values())
+            if callback is not None:
+                callback(i + 1, steps)
 
         return sample
 
@@ -164,6 +171,7 @@ class TripoSplatHybridPipeline:
         image: Image.Image,
         cfg: HybridSplatConfig = None,
         show_progress: bool = False,
+        callback=None,
     ) -> Tuple[bytes, bytes, bytes, Image.Image]:
         if cfg is None:
             cfg = HybridSplatConfig()
@@ -184,6 +192,7 @@ class TripoSplatHybridPipeline:
                 shift=cfg.shift,
                 seed=cfg.seed,
                 show_progress=show_progress,
+                callback=callback,
             )
             # Convert MLX latent to PyTorch for the decoder.
             latent_torch = {
@@ -204,6 +213,7 @@ class TripoSplatHybridPipeline:
             num_gaussians=cfg.num_gaussians,
             erode_radius=cfg.erode_radius,
             show_progress=show_progress,
+            callback=callback,
         )
         from .spz_utils import gaussian_to_spz_bytes
         return gaussian.to_ply_bytes(), gaussian.to_splat_bytes(), gaussian_to_spz_bytes(gaussian), prepared
