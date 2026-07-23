@@ -1,5 +1,13 @@
 # TripoFlux MLX
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Platform: macOS Apple Silicon](https://img.shields.io/badge/platform-macOS%20Apple%20Silicon-lightgrey)](https://support.apple.com/en-us/HT211814)
+[![MLX](https://img.shields.io/badge/MLX-native-green)](https://github.com/ml-explore/mlx)
+[![HuggingFace](https://img.shields.io/badge/%F0%9F%A4%97%20HuggingFace-Models-blue)](https://huggingface.co/Jup33QE/tripoflux-mlx)
+[![GitHub stars](https://img.shields.io/github/stars/Jup33Q/tripoflux-mlx?style=social)](https://github.com/Jup33Q/tripoflux-mlx)
+[![GitHub issues](https://img.shields.io/github/issues/Jup33Q/tripoflux-mlx)](https://github.com/Jup33Q/tripoflux-mlx/issues)
+
 MLX / CoreML accelerated pipeline for **FLUX.2-klein-9B → BiRefNet → TripoSplat** on Apple Silicon.
 
 ```text
