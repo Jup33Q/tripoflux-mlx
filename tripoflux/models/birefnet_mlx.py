@@ -36,6 +36,7 @@ class BiRefNetMLX:
         device: str = "mps",
         sam3_model: Optional[str] = None,
         da2_model: Optional[str] = None,
+        da2_coreml: bool = False,
     ):
         self.triposplat_dir = Path(triposplat_dir)
         self.backend = backend
@@ -59,8 +60,9 @@ class BiRefNetMLX:
                 self._da2 = DA2BackgroundRemover(
                     model_name=da2_model or "depth-anything/Depth-Anything-V2-Base",
                     device=device,
+                    use_coreml=da2_coreml,
                 )
-                logger.info("DA2 background remover initialized")
+                logger.info("DA2 background remover initialized (coreml=%s)", da2_coreml)
             except Exception as exc:
                 logger.warning("DA2 init failed, will use fallback: %s", exc)
                 self._da2 = None
@@ -96,6 +98,7 @@ def create_birefnet_remover(
     device: str = "mps",
     sam3_model: Optional[str] = None,
     da2_model: Optional[str] = None,
+    da2_coreml: bool = False,
 ) -> BiRefNetMLX:
     return BiRefNetMLX(
         triposplat_dir=triposplat_dir,
@@ -103,4 +106,5 @@ def create_birefnet_remover(
         device=device,
         sam3_model=sam3_model,
         da2_model=da2_model,
+        da2_coreml=da2_coreml,
     )
