@@ -1,3 +1,5 @@
+import SplatViewer from '/frontend/splat-viewer.js';
+
 (() => {
   const $ = (id) => document.getElementById(id);
   const promptEl = $("prompt");
@@ -139,67 +141,6 @@
       splatViewer.render();
     } catch (err) {
       console.error("splat preview error", err);
-    }
-  }
-
-  // Very small .splat parser / renderer (antialiasing-agnostic).
-  class SplatViewer {
-    constructor(canvas, buffer) {
-      this.canvas = canvas;
-      this.buffer = buffer;
-      this.scene = new THREE.Scene();
-      this.camera = new THREE.PerspectiveCamera(60, 1, 0.01, 100);
-      this.camera.position.set(0, 0, 3);
-      this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-      this.renderer.setSize(canvas.clientWidth, canvas.clientWidth, false);
-      this.controls = null;
-      this.points = null;
-      this._parse();
-      this._build();
-    }
-
-    _parse() {
-      const dv = new DataView(this.buffer);
-      const count = dv.byteLength / 32;
-      const positions = new Float32Array(count * 3);
-      const colors = new Float32Array(count * 3);
-      for (let i = 0; i < count; i++) {
-        const off = i * 32;
-        positions[i * 3 + 0] = dv.getFloat32(off + 0, true);
-        positions[i * 3 + 1] = dv.getFloat32(off + 4, true);
-        positions[i * 3 + 2] = dv.getFloat32(off + 8, true);
-        colors[i * 3 + 0] = dv.getUint8(off + 24) / 255;
-        colors[i * 3 + 1] = dv.getUint8(off + 25) / 255;
-        colors[i * 3 + 2] = dv.getUint8(off + 26) / 255;
-      }
-      this.positions = positions;
-      this.colors = colors;
-    }
-
-    _build() {
-      const geo = new THREE.BufferGeometry();
-      geo.setAttribute("position", new THREE.BufferAttribute(this.positions, 3));
-      geo.setAttribute("color", new THREE.BufferAttribute(this.colors, 3));
-      const mat = new THREE.PointsMaterial({
-        size: 0.02,
-        vertexColors: true,
-        sizeAttenuation: true,
-      });
-      this.points = new THREE.Points(geo, mat);
-      this.scene.add(this.points);
-      this.scene.background = new THREE.Color(0x0d1017);
-    }
-
-    render() {
-      this.renderer.render(this.scene, this.camera);
-    }
-
-    dispose() {
-      if (this.points) {
-        this.points.geometry.dispose();
-        this.points.material.dispose();
-      }
-      this.renderer.dispose();
     }
   }
 

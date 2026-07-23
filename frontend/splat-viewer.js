@@ -1,5 +1,8 @@
-// Minimal .splat viewer using Three.js with OrbitControls.
+// Gaussian Splat viewer using Three.js with OrbitControls (ES modules).
 // Parses the 32-byte-per-splat format produced by TripoSplat.
+
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 class SplatViewer {
   constructor(canvas, buffer) {
@@ -16,11 +19,14 @@ class SplatViewer {
     this.renderer.setPixelRatio(window.devicePixelRatio || 1);
     this.renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
 
-    this.controls = new THREE.OrbitControls(this.camera, canvas);
+    this.controls = new OrbitControls(this.camera, canvas);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.05;
-    this.controls.minDistance = 0.5;
-    this.controls.maxDistance = 20;
+    this.controls.minDistance = 0.1;
+    this.controls.maxDistance = 50;
+    this.controls.enablePan = true;
+    this.controls.enableZoom = true;
+    this.controls.enableRotate = true;
 
     this._parse();
     this._build();
@@ -38,9 +44,17 @@ class SplatViewer {
 
     for (let i = 0; i < count; i++) {
       const off = i * 32;
-      positions[i * 3 + 0] = dv.getFloat32(off + 0, true);
-      positions[i * 3 + 1] = dv.getFloat32(off + 4, true);
-      positions[i * 3 + 2] = dv.getFloat32(off + 8, true);
+      const x = dv.getFloat32(off + 0, true);
+      const y = dv.getFloat32(off + 4, true);
+      const z = dv.getFloat32(off + 8, true);
+
+      // TripoSplat applies _DEFAULT_TRANSFORM before saving:
+      //   new_x = old_x, new_y = old_z, new_z = -old_y
+      // Three.js uses right-handed: X right, Y up, Z toward viewer.
+      // We map splat (x, y, z) -> three.js (x, z, -y) so the model appears upright.
+      positions[i * 3 + 0] = x;
+      positions[i * 3 + 1] = z;
+      positions[i * 3 + 2] = -y;
 
       scales[i * 3 + 0] = dv.getFloat32(off + 12, true);
       scales[i * 3 + 1] = dv.getFloat32(off + 16, true);
@@ -123,3 +137,5 @@ class SplatViewer {
     this.renderer.dispose();
   }
 }
+
+export default SplatViewer;
