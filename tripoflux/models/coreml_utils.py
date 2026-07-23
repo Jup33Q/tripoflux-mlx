@@ -82,6 +82,9 @@ class CoreMLPredictor:
 def load_coreml_model(path: Union[str, Path]) -> Optional[CoreMLPredictor]:
     try:
         return CoreMLPredictor(path)
+    except FileNotFoundError:
+        logger.debug("CoreML model not found at %s, will use PyTorch fallback", path)
+        return None
     except Exception as exc:  # pragma: no cover
         logger.warning("Failed to load CoreML model %s: %s", path, exc)
         return None
