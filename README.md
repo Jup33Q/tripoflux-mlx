@@ -81,8 +81,11 @@ cd tripoflux-mlx
 pip install -e ".[dev]"
 
 # 3. Install mflux (native MLX FLUX.2 runtime)
-pip install mflux -i https://pypi.tuna.tsinghua.edu.cn/simple
-# If the default PyPI index is slow, the mirror above is recommended.
+#    We currently use our own fork, which carries PR #481 (mlx 0.32.x support)
+#    on top of upstream 0.18.0. This is already pinned in pyproject.toml, so
+#    `pip install -e .` above pulls it in automatically; to (re)install it
+#    standalone:
+pip install "mflux @ git+https://github.com/Jup33Q/mflux.git@main"
 
 # 4. Download model weights manually
 #    a) TripoSplat checkpoints → ckpts/VAST-AI/TripoSplat/

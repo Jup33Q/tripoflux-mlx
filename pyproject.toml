@@ -39,6 +39,7 @@ dependencies = [
     "diffusers>=0.27.0",
     "mlx>=0.15.0; platform_machine == 'arm64' and sys_platform == 'darwin'",
     "mlx-lm>=0.8.0; platform_machine == 'arm64' and sys_platform == 'darwin'",
+    "mflux @ git+https://github.com/Jup33Q/mflux.git@main; platform_machine == 'arm64' and sys_platform == 'darwin'",
     "coremltools>=7.0; sys_platform == 'darwin'",
 ]
 
