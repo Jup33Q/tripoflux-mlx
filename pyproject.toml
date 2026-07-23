@@ -1,0 +1,67 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tripoflux-mlx"
+version = "0.1.0"
+description = "MLX/CoreML accelerated Flux Klein → BiRefNet → TripoSplat pipeline"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "TripoFlux MLX Team"},
+]
+keywords = ["mlx", "coreml", "triposplat", "flux", "gaussian-splatting"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "torch>=2.0.0",
+    "torchvision>=0.15.0",
+    "safetensors>=0.4.0",
+    "Pillow>=10.0.0",
+    "numpy>=1.24.0",
+    "tqdm>=4.65.0",
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.27.0",
+    "python-multipart>=0.0.9",
+    "jinja2>=3.1.0",
+    "pyyaml>=6.0",
+    "huggingface-hub>=0.21.0",
+    "transformers>=4.38.0",
+    "diffusers>=0.27.0",
+    "mlx>=0.15.0; platform_machine == 'arm64' and sys_platform == 'darwin'",
+    "mlx-lm>=0.8.0; platform_machine == 'arm64' and sys_platform == 'darwin'",
+    "coremltools>=7.0; sys_platform == 'darwin'",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "black>=24.0.0",
+    "ruff>=0.3.0",
+]
+
+[project.scripts]
+tripoflux-download = "scripts.download_models:main"
+tripoflux-serve = "tripoflux.server:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["tripoflux*", "scripts*"]
+
+[tool.black]
+line-length = 100
+target-version = ['py310']
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]

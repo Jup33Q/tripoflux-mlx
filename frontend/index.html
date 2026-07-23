@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TripoFlux MLX</title>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --panel: #171a21;
+      --border: #2a2f3a;
+      --text: #e6e9ef;
+      --muted: #9aa3b2;
+      --accent: #4f8cff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+    }
+    header h1 { margin: 0; font-size: 20px; font-weight: 600; }
+    header p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+    main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 24px;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+    input, textarea, select {
+      width: 100%;
+      background: #0d1017;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 10px 12px;
+      font-size: 14px;
+      margin-bottom: 14px;
+    }
+    textarea { resize: vertical; min-height: 100px; }
+    button {
+      width: 100%;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .progress {
+      margin-top: 14px;
+      background: #0d1017;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .progress-bar {
+      height: 10px;
+      background: var(--accent);
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+    .progress-text {
+      padding: 8px 12px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .preview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+    }
+    .preview-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .preview-card h3 { margin: 0 0 12px; font-size: 14px; }
+    .preview-card img, .preview-card canvas {
+      width: 100%;
+      border-radius: 8px;
+      background: #0d1017;
+      display: block;
+    }
+    .preview-card canvas { aspect-ratio: 1; }
+    .checkerboard {
+      background-image: linear-gradient(45deg, #333 25%, transparent 25%),
+        linear-gradient(-45deg, #333 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #333 75%),
+        linear-gradient(-45deg, transparent 75%, #333 75%);
+      background-size: 16px 16px;
+      background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+    }
+    .status { font-size: 13px; color: var(--muted); margin-top: 8px; }
+    .error { color: #ff6b6b; }
+    .links { margin-top: 12px; display: flex; gap: 12px; }
+    .links a { color: var(--accent); font-size: 13px; }
+    @media (max-width: 900px) {
+      main { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>TripoFlux MLX</h1>
+    <p>FLUX.2-klein-9B → BiRefNet → TripoSplat Gaussian Splatting on Apple Silicon</p>
+  </header>
+  <main>
+    <section class="panel">
+      <label for="prompt">Prompt</label>
+      <textarea id="prompt" placeholder="A red sports car, studio lighting, product photography..."></textarea>
+
+      <label for="negative_prompt">Negative Prompt (optional)</label>
+      <textarea id="negative_prompt" placeholder="blurry, low quality, text, watermark..."></textarea>
+
+      <label for="seed">Seed (optional)</label>
+      <input id="seed" type="number" placeholder="42" />
+
+      <label for="width">Width</label>
+      <input id="width" type="number" value="1024" />
+
+      <label for="height">Height</label>
+      <input id="height" type="number" value="1024" />
+
+      <label for="num_gaussians">Number of Gaussians</label>
+      <select id="num_gaussians">
+        <option value="32768">32,768 (fast)</option>
+        <option value="65536">65,536</option>
+        <option value="131072">131,072</option>
+        <option value="262144" selected>262,144 (best quality)</option>
+      </select>
+
+      <label for="flux_quantize">FLUX Quantization</label>
+      <select id="flux_quantize">
+        <option value="">None (largest, best quality)</option>
+        <option value="8" selected>8-bit (balanced)</option>
+        <option value="4">4-bit (smallest, fastest)</option>
+      </select>
+
+      <button id="generate">Generate Splat</button>
+
+      <div class="progress">
+        <div class="progress-bar" id="progressBar"></div>
+        <div class="progress-text" id="progressText">Idle</div>
+      </div>
+      <div class="status" id="status"></div>
+
+      <label style="margin-top:16px;">Terminal</label>
+      <div id="terminal" style="background:#0d1017;border:1px solid var(--border);border-radius:8px;padding:12px;font-family:monospace;font-size:12px;color:#9aa3b2;height:180px;overflow-y:auto;white-space:pre-wrap;"></div>
+    </section>
+
+    <section>
+      <div class="preview-grid">
+        <div class="preview-card">
+          <h3>Generated Image</h3>
+          <img id="generatedImage" alt="Generated" />
+        </div>
+        <div class="preview-card">
+          <h3>Background Removed</h3>
+          <div class="checkerboard" style="border-radius:8px; overflow:hidden;">
+            <img id="rgbaImage" alt="RGBA" />
+          </div>
+        </div>
+        <div class="preview-card">
+          <h3>Gaussian Splat Preview</h3>
+          <canvas id="splatCanvas"></canvas>
+          <div class="links">
+            <a id="downloadPly" href="#" download="model.ply">Download .ply</a>
+            <a id="downloadSpz" href="#" download="model.spz">Download .spz</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="/frontend/splat-viewer.js"></script>
+  <script src="/frontend/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,40 @@
+# Default configuration for tripoflux-mlx
+
+models:
+  # TripoSplat checkpoints (downloaded by scripts/download_models.sh)
+  triposplat_dir: "ckpts/VAST-AI/TripoSplat"
+  triposplat_fp16: "ckpts/VAST-AI/TripoSplat/diffusion_models/triposplat_fp16.safetensors"
+  dinov3_vit_h: "ckpts/VAST-AI/TripoSplat/clip_vision/dino_v3_vit_h.safetensors"
+  triposplat_vae_decoder: "ckpts/VAST-AI/TripoSplat/vae/triposplat_vae_decoder_fp16.safetensors"
+  flux2_vae: "ckpts/VAST-AI/TripoSplat/vae/flux2-vae.safetensors"
+  birefnet: "ckpts/VAST-AI/TripoSplat/background_removal/birefnet.safetensors"
+
+  # FLUX.2-klein-9B (MLX community checkpoint)
+  flux_klein_mlx: "mlx-community/FLUX.2-klein-9B"
+
+# Runtime backends
+backend:
+  flux: "mlx"            # mlx | mps
+  birefnet: "mlx"        # mlx | coreml | mps
+  triposplat: "mlx"      # mps | mlx (mlx = hybrid MLX encoders + MPS decoder)
+
+# Quantization (FLUX.2 only, via mflux)
+quantization:
+  flux_bits: 8           # 4 | 8 | null (null = no quantization, largest file)
+
+# Default inference parameters
+inference:
+  image_height: 1024
+  image_width: 1024
+  num_inference_steps: 4
+  guidance_scale: 1.0
+  triposplat_steps: 20
+  triposplat_guidance_scale: 3.0
+  triposplat_shift: 3.0
+  num_gaussians: 262144
+  seed: 42
+
+# Web server
+server:
+  host: "127.0.0.1"
+  port: 8000
