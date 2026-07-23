@@ -29,7 +29,7 @@ prompt ──► FLUX.2-klein-9B (MLX) ──► RGB image
 ## Features
 
 - **MLX-first** image generation with `mflux` / `FLUX.2-klein-9B`.
-- **Background removal** via BiRefNet, preferring MLX, falling back to CoreML or PyTorch MPS.
+- **Background removal** via BiRefNet / SAM3 / DA2, preferring MLX, falling back to CoreML or PyTorch MPS.
 - **3D Gaussian Splatting** via the official [TripoSplat](https://github.com/VAST-AI-Research/TripoSplat) model.
 - Web UI with image preview and `.splat` viewer.
 - **MLX ports** for TripoSplat submodules:
@@ -37,6 +37,7 @@ prompt ──► FLUX.2-klein-9B (MLX) ──► RGB image
   - ✅ `Flux2VAEEncoder` (`tripoflux/models/flux2vae_mlx.py`)
   - ✅ `LatentSeqMMFlowModel` flow transformer (`tripoflux/models/flow_mlx.py`)
   - ⏳ `OctreeGaussianDecoder` (remains on PyTorch MPS; complex dynamic sampling)
+- **DA2 CoreML** models for fast depth-based background removal (base + large).
 
 ## TODO
 
@@ -49,13 +50,13 @@ prompt ──► FLUX.2-klein-9B (MLX) ──► RGB image
 - [x] Web UI with Three.js splat viewer + OrbitControls
 - [x] SPZ export support (Niantic compressed splat format)
 - [x] SAM3 background removal via mlx-vlm
+- [x] DA2 CoreML background removal (base + large)
 - [x] mflux PR #481: Support mlx 0.32.x
 
 ### In Progress
 - [ ] OctreeGaussianDecoder full MLX port (dynamic sampling logic)
 - [ ] BiRefNet native MLX port (Swin-L + deformable ASPP)
 - [ ] mlx-community submission for TripoSplat MLX weights
-- [ ] DA2 (Depth Anything V2) background removal alternative
 
 ### Planned
 - [ ] CoreML conversion for static encoders (DinoV3, VAE)
@@ -91,6 +92,9 @@ pip install mflux -i https://pypi.tuna.tsinghua.edu.cn/simple
 #       - vae/flux2-vae.safetensors
 #       - background_removal/birefnet.safetensors
 #    b) FLUX.2-klein-9B is fetched automatically by mflux on first use.
+#    c) (Optional) DA2 CoreML models from HuggingFace:
+#       - da2_base.mlpackage
+#       - da2_large.mlpackage
 
 # 5. Start the web UI
 python -m tripoflux.server

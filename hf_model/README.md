@@ -29,6 +29,8 @@ The original TripoSplat decoder (`OctreeGaussianDecoder`) remains on PyTorch MPS
 | `triposplat_fp16.safetensors` | 741 MB | LatentSeqMMFlowModel (flow transformer) |
 | `triposplat_vae_decoder_fp16.safetensors` | 576 MB | TripoSplat VAE decoder |
 | `birefnet.safetensors` | 444 MB | BiRefNet background removal |
+| `da2_base.mlpackage` | ~200 MB | DA2 Base CoreML (background removal via depth) |
+| `da2_large.mlpackage` | ~800 MB | DA2 Large CoreML (background removal via depth) |
 
 ## Usage
 
@@ -52,6 +54,25 @@ flow = LatentSeqMMFlowModel(
 )
 flow.load_safetensors("triposplat_fp16.safetensors")
 ```
+
+## DA2 CoreML Background Removal
+
+DA2 (Depth Anything V2) provides an alternative background-removal path using depth estimation:
+
+```python
+from tripoflux.models.birefnet_da2 import DA2BackgroundRemover
+
+# Use local CoreML model
+remover = DA2BackgroundRemover(
+    use_coreml=True,
+    coreml_path="da2_base.mlpackage",  # or da2_large.mlpackage
+)
+
+rgba = remover.remove_background(image)
+```
+
+- `da2_base.mlpackage`: faster, lower memory
+- `da2_large.mlpackage`: better quality, higher memory
 
 ## Full Pipeline
 
