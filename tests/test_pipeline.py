@@ -31,7 +31,7 @@ def test_flux_config_defaults():
 def test_splat_config_defaults():
     cfg = SplatGenerationConfig()
     assert cfg.num_gaussians == 262144
-    assert cfg.steps == 20
+    assert cfg.steps == 28
     assert cfg.guidance_scale == 3.0
 
 

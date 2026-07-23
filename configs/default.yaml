@@ -28,7 +28,7 @@ inference:
   image_width: 1024
   num_inference_steps: 4
   guidance_scale: 1.0
-  triposplat_steps: 20
+  triposplat_steps: 28
   triposplat_guidance_scale: 3.0
   triposplat_shift: 3.0
   num_gaussians: 262144

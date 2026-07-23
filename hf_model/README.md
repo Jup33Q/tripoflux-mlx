@@ -1,5 +1,6 @@
 ---
-license: mit
+license: other
+license_name: mixed-see-license-section
 tags:
 - mlx
 - triposplat
@@ -29,8 +30,37 @@ The original TripoSplat decoder (`OctreeGaussianDecoder`) remains on PyTorch MPS
 | `triposplat_fp16.safetensors` | 741 MB | LatentSeqMMFlowModel (flow transformer) |
 | `triposplat_vae_decoder_fp16.safetensors` | 576 MB | TripoSplat VAE decoder |
 | `birefnet.safetensors` | 444 MB | BiRefNet background removal |
-| `da2_base.mlpackage` | ~200 MB | DA2 Base CoreML (background removal via depth) |
-| `da2_large.mlpackage` | ~800 MB | DA2 Large CoreML (background removal via depth) |
+
+## License
+
+This is a **mixed-license repository**. The most restrictive artifact determines
+what the repository as a whole can be used for — with `flux2-vae.safetensors`
+included, the repo as a whole is **non-commercial only**.
+
+### ⛔ Non-commercial — separate restriction
+
+| File | Upstream | License | Terms |
+|------|----------|---------|-------|
+| `flux2-vae.safetensors` | [black-forest-labs/FLUX.2-klein-9B](https://huggingface.co/black-forest-labs/FLUX.2-klein-9B) | **FLUX Non-Commercial License** | Weights are gated upstream. Commercial use of the weights or their outputs requires a paid license from Black Forest Labs. If you need a fully permissive stack, delete this file and load the VAE from the upstream gated repo at runtime after accepting its terms. |
+
+### ⚠️ Custom permissive license — attribution required on redistribution
+
+| File | Upstream | License | Terms |
+|------|----------|---------|-------|
+| `dino_v3_vit_h.safetensors` | [facebook/dinov3](https://github.com/facebookresearch/dinov3) | **DINOv3 License** | Commercial use **is allowed**, but any redistribution of copies or derivatives must include the DINOv3 License text. Upstream downloads are gated and unavailable in sanctioned jurisdictions. |
+
+### ✅ MIT — permissive core
+
+| File | Upstream | License |
+|------|----------|---------|
+| `triposplat_fp16.safetensors` | [VAST-AI/TripoSplat](https://huggingface.co/VAST-AI/TripoSplat) | MIT |
+| `triposplat_vae_decoder_fp16.safetensors` | [VAST-AI/TripoSplat](https://huggingface.co/VAST-AI/TripoSplat) | MIT |
+| `birefnet.safetensors` | [ZhengPeng7/BiRefNet](https://huggingface.co/ZhengPeng7/BiRefNet) | MIT |
+| `mlx_models/*.py` | this repo (MLX port) | MIT |
+
+The MLX port code in `mlx_models/` is released under the
+[MIT License](https://opensource.org/licenses/MIT), same as the main project:
+[https://github.com/Jup33Q/tripoflux-mlx](https://github.com/Jup33Q/tripoflux-mlx).
 
 ## Usage
 
@@ -55,30 +85,7 @@ flow = LatentSeqMMFlowModel(
 flow.load_safetensors("triposplat_fp16.safetensors")
 ```
 
-## DA2 CoreML Background Removal
-
-DA2 (Depth Anything V2) provides an alternative background-removal path using depth estimation:
-
-```python
-from tripoflux.models.birefnet_da2 import DA2BackgroundRemover
-
-# Use local CoreML model
-remover = DA2BackgroundRemover(
-    use_coreml=True,
-    coreml_path="da2_base.mlpackage",  # or da2_large.mlpackage
-)
-
-rgba = remover.remove_background(image)
-```
-
-- `da2_base.mlpackage`: faster, lower memory
-- `da2_large.mlpackage`: better quality, higher memory
-
 ## Full Pipeline
 
 For the complete text-to-3D pipeline (FLUX.2-klein-9B → BiRefNet → TripoSplat), see the main project:
 [https://github.com/Jup33Q/tripoflux-mlx](https://github.com/Jup33Q/tripoflux-mlx)
-
-## License
-
-MIT. Original TripoSplat code and weights are MIT-licensed by VAST-AI-Research.

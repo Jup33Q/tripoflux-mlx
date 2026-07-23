@@ -29,7 +29,7 @@ class PipelineConfig:
     image_height: int = 1024
     flux_steps: int = 4
     flux_guidance: float = 1.0
-    splat_steps: int = 20
+    splat_steps: int = 28
     splat_guidance: float = 3.0
     splat_shift: float = 3.0
     num_gaussians: int = 262144

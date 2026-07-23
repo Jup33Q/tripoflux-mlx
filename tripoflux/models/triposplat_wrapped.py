@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 class SplatGenerationConfig:
     num_gaussians: int = 262144
     seed: int = 42
-    steps: int = 20
+    steps: int = 28
     guidance_scale: float = 3.0
     shift: float = 3.0
     erode_radius: int = 1
