@@ -8,6 +8,7 @@ import SplatViewer from '/frontend/splat-viewer.js';
   const widthEl = $("width");
   const heightEl = $("height");
   const numGaussiansEl = $("num_gaussians");
+  const splatStepsEl = $("splat_steps");
   const fluxQuantizeEl = $("flux_quantize");
   const generateBtn = $("generate");
   const progressBar = $("progressBar");
@@ -126,6 +127,7 @@ import SplatViewer from '/frontend/splat-viewer.js';
           width: parseInt(widthEl.value, 10),
           height: parseInt(heightEl.value, 10),
           num_gaussians: parseInt(numGaussiansEl.value, 10),
+          splat_steps: parseInt(splatStepsEl.value, 10),
           flux_quantize: fluxQuantizeEl.value ? parseInt(fluxQuantizeEl.value, 10) : null,
         }),
       });

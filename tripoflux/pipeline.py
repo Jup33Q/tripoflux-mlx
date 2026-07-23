@@ -131,6 +131,7 @@ class TripoFluxPipeline:
         rgba_image: Image.Image,
         num_gaussians: Optional[int] = None,
         seed: Optional[int] = None,
+        steps: Optional[int] = None,
         progress: Optional[ProgressCallback] = None,
     ) -> Tuple[bytes, bytes, bytes, Image.Image]:
         self._progress(progress, "triposplat", 0.0)
@@ -143,7 +144,7 @@ class TripoFluxPipeline:
             cfg=SplatGenerationConfig(
                 num_gaussians=num_gaussians or self.cfg.num_gaussians,
                 seed=seed if seed is not None else self.cfg.seed,
-                steps=self.cfg.splat_steps,
+                steps=steps or self.cfg.splat_steps,
                 guidance_scale=self.cfg.splat_guidance,
                 shift=self.cfg.splat_shift,
             ),

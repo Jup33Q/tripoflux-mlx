@@ -46,6 +46,7 @@ class GenerateRequest(BaseModel):
     width: int = 1024
     height: int = 1024
     num_gaussians: int = 262144
+    splat_steps: Optional[int] = Field(None, description="TripoSplat sampler steps, e.g. 20/24/28")
     flux_quantize: Optional[int] = Field(None, description="4 or 8 for mflux quantization")
 
 
@@ -276,6 +277,7 @@ async def stream(job_id: str) -> StreamingResponse:
                     rgba,
                     num_gaussians=req.get("num_gaussians"),
                     seed=req.get("seed"),
+                    steps=req.get("splat_steps"),
                     progress=on_progress,
                 )
 
@@ -293,6 +295,7 @@ async def stream(job_id: str) -> StreamingResponse:
                         "width": req.get("width") or pipeline.cfg.image_width,
                         "height": req.get("height") or pipeline.cfg.image_height,
                         "num_gaussians": req.get("num_gaussians") or pipeline.cfg.num_gaussians,
+                        "splat_steps": req.get("splat_steps") or pipeline.cfg.splat_steps,
                         "flux_quantize": req.get("flux_quantize") or pipeline.cfg.flux_quantize,
                         "negative_prompt": req.get("negative_prompt"),
                         "flux_backend": pipeline.cfg.flux_backend,
