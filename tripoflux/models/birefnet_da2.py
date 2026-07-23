@@ -26,6 +26,7 @@ class DA2BackgroundRemover:
         device: str = "mps",
         foreground_percentile: float = 30.0,
         use_coreml: bool = False,
+        coreml_path: Optional[Union[str, Path]] = None,
     ):
         """
         Args:
@@ -35,12 +36,15 @@ class DA2BackgroundRemover:
                 - depth-anything/Depth-Anything-V2-Large
             device: PyTorch device (mps, cpu, cuda).
             foreground_percentile: Depth percentile threshold for foreground.
-            use_coreml: Use Apple's official CoreML model (small only).
+            use_coreml: Use CoreML backend instead of PyTorch.
+            coreml_path: Path to a local .mlpackage file. If None and
+                use_coreml=True, downloads apple/coreml-depth-anything-v2-small.
         """
         self.model_name = model_name
         self.device = torch.device(device)
         self.foreground_percentile = foreground_percentile
         self.use_coreml = use_coreml
+        self.coreml_path = Path(coreml_path) if coreml_path else None
         self._pipe = None
         self._coreml_model = None
 
@@ -70,13 +74,18 @@ class DA2BackgroundRemover:
         if self._coreml_model is not None:
             return self._coreml_model
         try:
-            from huggingface_hub import snapshot_download
             import coremltools as ct
 
-            model_path = snapshot_download("apple/coreml-depth-anything-v2-small")
-            mlpackage = list(Path(model_path).glob("*.mlpackage"))[0]
+            if self.coreml_path is not None:
+                mlpackage = self.coreml_path
+            else:
+                from huggingface_hub import snapshot_download
+
+                model_path = snapshot_download("apple/coreml-depth-anything-v2-small")
+                mlpackage = list(Path(model_path).glob("*.mlpackage"))[0]
+
             self._coreml_model = ct.models.MLModel(str(mlpackage))
-            logger.info("Loaded DA2 CoreML model: apple/coreml-depth-anything-v2-small")
+            logger.info("Loaded DA2 CoreML model: %s", mlpackage)
             return self._coreml_model
         except Exception as exc:
             logger.warning("DA2 CoreML load failed: %s", exc)
@@ -142,10 +151,12 @@ def create_da2_remover(
     device: str = "mps",
     foreground_percentile: float = 30.0,
     use_coreml: bool = False,
+    coreml_path: Optional[Union[str, Path]] = None,
 ) -> DA2BackgroundRemover:
     return DA2BackgroundRemover(
         model_name=model_name,
         device=device,
         foreground_percentile=foreground_percentile,
         use_coreml=use_coreml,
+        coreml_path=coreml_path,
     )
