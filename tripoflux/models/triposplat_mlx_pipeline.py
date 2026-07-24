@@ -32,6 +32,9 @@ class HybridSplatConfig:
     guidance_scale: float = 3.0
     shift: float = 3.0
     erode_radius: int = 1
+    # Intermediate splat preview snapshots during sampling.
+    preview_every: int = 4  # snapshot every N sampler steps (0 = off)
+    preview_gaussians: int = 65536  # lighter decode for snapshots
 
 
 class TripoSplatHybridPipeline:
@@ -127,6 +130,7 @@ class TripoSplatHybridPipeline:
         seed: int = 42,
         show_progress: bool = False,
         callback=None,
+        preview_hook=None,
     ) -> dict:
         """Run the Euler CFG sampler using the MLX flow model."""
         if self._flow_mlx is None:
@@ -165,6 +169,8 @@ class TripoSplatHybridPipeline:
             mx.eval(*sample.values())
             if callback is not None:
                 callback(iterator.n, steps)
+            if preview_hook is not None:
+                preview_hook(sample, iterator.n, steps)
 
         return sample
 
@@ -174,6 +180,7 @@ class TripoSplatHybridPipeline:
         cfg: HybridSplatConfig = None,
         show_progress: bool = False,
         callback=None,
+        preview_callback=None,
     ) -> Tuple[bytes, bytes, bytes, Image.Image]:
         if cfg is None:
             cfg = HybridSplatConfig()
@@ -187,6 +194,25 @@ class TripoSplatHybridPipeline:
             logger.info("Running TripoSplat with MLX encoders + MLX flow model + MPS decoder")
             prepared = self.preprocess_image(image, erode_radius=cfg.erode_radius)
             cond = self.encode_image_mlx(prepared)
+
+            # Snapshot hook: decode the intermediate latent to a lightweight
+            # splat every few steps so the web UI can morph the preview while
+            # sampling continues undisturbed. getattr because the wrapper's
+            # SplatGenerationConfig may not carry these fields.
+            preview_hook = None
+            preview_every = getattr(cfg, "preview_every", 4)
+            preview_gaussians = getattr(cfg, "preview_gaussians", 65536)
+            if preview_callback is not None and preview_every > 0:
+                def preview_hook(sample, n, total):
+                    if n % preview_every != 0 or n >= total:
+                        return
+                    try:
+                        lat = torch.from_numpy(np.array(sample['latent'])).to(self.device)
+                        g = self._torch_pipeline.decode_latent(lat, num_gaussians=preview_gaussians)
+                        preview_callback(n, g.to_splat_bytes())
+                    except Exception:
+                        logger.exception("splat preview snapshot failed at step %s", n)
+
             latent = self._sample_latent_mlx(
                 cond,
                 steps=cfg.steps,
@@ -195,6 +221,7 @@ class TripoSplatHybridPipeline:
                 seed=cfg.seed,
                 show_progress=show_progress,
                 callback=callback,
+                preview_hook=preview_hook,
             )
             # Convert MLX latent to PyTorch for the decoder.
             latent_torch = {

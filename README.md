@@ -31,7 +31,8 @@ prompt ──► FLUX.2-klein-9B (MLX) ──► RGB image
 - **MLX-first** image generation with `mflux` / `FLUX.2-klein-9B`.
 - **Background removal** via BiRefNet / SAM3 / DA2, preferring MLX, falling back to CoreML or PyTorch MPS.
 - **3D Gaussian Splatting** via the official [TripoSplat](https://github.com/VAST-AI-Research/TripoSplat) model.
-- Web UI with image preview and `.splat` viewer.
+- **R3F web UI**: React Three Fiber splat viewport with OrbitControls, inline generation progress, log terminal, and **Looking Glass (LKG) holographic preview** via `@lookingglass/webxr` (WASD orbits, arrow keys dolly).
+- **Smooth model transitions**: the viewport lerp/slerp-morphs from the current model to each newly generated splat.
 - **MLX ports** for TripoSplat submodules:
   - ✅ `DinoV3ViT` image encoder (`tripoflux/models/dinov3_mlx.py`)
   - ✅ `Flux2VAEEncoder` (`tripoflux/models/flux2vae_mlx.py`)
@@ -47,7 +48,9 @@ prompt ──► FLUX.2-klein-9B (MLX) ──► RGB image
 - [x] TripoSplat MLX ports: DinoV3ViT, Flux2VAEEncoder, LatentSeqMMFlowModel
 - [x] Hybrid MLX/MPS TripoSplat pipeline
 - [x] FastAPI backend with SSE progress streaming
-- [x] Web UI with Three.js splat viewer + OrbitControls
+- [x] R3F web UI: splat viewer + OrbitControls, inline progress, terminal
+- [x] Looking Glass WebXR preview (LKG quilt) with keyboard orbit/dolly
+- [x] Splat-to-splat lerp/slerp morph transitions
 - [x] SPZ export support (Niantic compressed splat format)
 - [x] SAM3 background removal via mlx-vlm
 - [x] DA2 CoreML background removal (base + large)
@@ -61,7 +64,6 @@ prompt ──► FLUX.2-klein-9B (MLX) ──► RGB image
 ### Planned
 - [ ] CoreML conversion for static encoders (DinoV3, VAE)
 - [ ] Batch generation API
-- [ ] WebUI with real-time preview (streaming intermediate latents)
 - [ ] macOS Swift app deployment (MLX Swift)
 - [ ] 4-bit quantized TripoSplat weights
 
@@ -99,9 +101,23 @@ pip install "mflux @ git+https://github.com/Jup33Q/mflux.git@main"
 #       - da2_base.mlpackage
 #       - da2_large.mlpackage
 
-# 5. Start the web UI
+# 5. Install frontend dependencies
+cd frontend && npm install && cd ..
+
+# 6. Start the web UI (production: build the frontend, then serve via FastAPI)
+cd frontend && npm run build && cd ..
 python -m tripoflux.server
-# open http://localhost:8000
+# open http://localhost:8321
+```
+
+### Development mode
+
+Run the Vite dev server (hot reload, proxies `/api` to the backend on :8321)
+alongside the FastAPI backend:
+
+```bash
+python -m tripoflux.server          # terminal 1 → http://127.0.0.1:8321
+cd frontend && npm run dev          # terminal 2 → http://localhost:5173
 ```
 
 ## Quantization
@@ -126,9 +142,9 @@ Or choose per-request in the web UI dropdown.
 ```
 tripoflux-mlx/
 ├── configs/default.yaml          # model paths & default parameters
-├── frontend/                     # web UI (HTML/JS)
+├── frontend/                     # web UI (Vite + React 19 + TypeScript + React Three Fiber)
 ├── scripts/
-│   ├── download_models.py        # fetch all required weights
+│   ├── download_models.sh        # fetch all required weights
 │   └── convert_birefnet_coreml.py
 ├── tests/
 │   └── test_pipeline.py

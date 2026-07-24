@@ -133,6 +133,7 @@ class TripoFluxPipeline:
         seed: Optional[int] = None,
         steps: Optional[int] = None,
         progress: Optional[ProgressCallback] = None,
+        preview: Optional[Callable[[int, bytes], None]] = None,
     ) -> Tuple[bytes, bytes, bytes, Image.Image]:
         self._progress(progress, "triposplat", 0.0)
 
@@ -149,6 +150,7 @@ class TripoFluxPipeline:
                 shift=self.cfg.splat_shift,
             ),
             callback=on_step if progress is not None else None,
+            preview_callback=preview,
         )
         self._progress(progress, "triposplat", 1.0)
         return ply, splat, spz, prepared

@@ -80,11 +80,15 @@ class TripoSplatGenerator:
         cfg: SplatGenerationConfig = None,
         show_progress: bool = False,
         callback=None,
+        preview_callback=None,
     ) -> Tuple[bytes, bytes, bytes, Image.Image]:
         """Convert an RGBA image to Gaussian Splat bytes.
 
         Args:
             callback: Optional ``fn(step, total)`` invoked after each sampler step.
+            preview_callback: Optional ``fn(step, splat_bytes)`` invoked with a
+                lightweight intermediate splat every few sampler steps
+                (MLX/hybrid backend only).
 
         Returns:
             (ply_bytes, splat_bytes, spz_bytes, prepared_image)
@@ -98,6 +102,7 @@ class TripoSplatGenerator:
                 cfg=cfg,
                 show_progress=show_progress,
                 callback=callback,
+                preview_callback=preview_callback,
             )
         else:
             gaussian, prepared = self._pipeline.run(

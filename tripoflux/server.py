@@ -74,19 +74,23 @@ def get_pipeline() -> TripoFluxPipeline:
     return _pipeline
 
 
+_FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+
+
 @app.get("/", response_class=HTMLResponse)
 async def index() -> HTMLResponse:
-    frontend_dir = Path(__file__).resolve().parent.parent / "frontend"
-    index_file = frontend_dir / "index.html"
+    index_file = _FRONTEND_DIST / "index.html"
     if not index_file.exists():
-        raise HTTPException(status_code=404, detail="frontend/index.html not found")
+        raise HTTPException(
+            status_code=404,
+            detail="frontend/dist/index.html not found; run `cd frontend && npm run build` first",
+        )
     return HTMLResponse(index_file.read_text(encoding="utf-8"))
 
 
-@app.get("/frontend/{file_path:path}")
-async def frontend_static(file_path: str):
-    frontend_dir = Path(__file__).resolve().parent.parent / "frontend"
-    target = frontend_dir / file_path
+@app.get("/assets/{file_path:path}")
+async def frontend_assets(file_path: str):
+    target = _FRONTEND_DIST / "assets" / file_path
     if not target.exists() or not target.is_file():
         raise HTTPException(status_code=404, detail="file not found")
     return FileResponse(target)
@@ -176,6 +180,15 @@ async def result_spz(job_id: str):
         media_type="application/octet-stream",
         headers={"Content-Disposition": f'attachment; filename="{job_id}.spz"'},
     )
+
+
+@app.get("/api/result/{job_id}/splat_preview/{step}")
+async def result_splat_preview(job_id: str, step: int):
+    job = _jobs.get(job_id)
+    data = (job or {}).get("splat_previews", {}).get(str(step))
+    if data is None:
+        raise HTTPException(status_code=404, detail="preview not ready")
+    return StreamingResponse(io.BytesIO(data), media_type="application/octet-stream")
 
 
 @app.get("/api/result/{job_id}/stage/{stage}")
@@ -273,6 +286,11 @@ async def stream(job_id: str) -> StreamingResponse:
                 emit({"status": "running", "stage": "triposplat", "stage_progress": 0.0,
                       "progress": STAGE_SPAN["triposplat"][0],
                       "log": "Generating 3D Gaussian Splat..."})
+                # NOTE: intermediate 4-step splat snapshots were removed — each
+                # snapshot costs an extra MPS decode and slows sampling down
+                # noticeably. The viewport still lerp/slerp-morphs once the
+                # final splat arrives. The pipeline keeps an opt-in
+                # preview_callback if this is ever wanted again.
                 ply, splat, spz, prepared = pipeline.generate_splat(
                     rgba,
                     num_gaussians=req.get("num_gaussians"),
@@ -334,7 +352,7 @@ async def stream(job_id: str) -> StreamingResponse:
 
 def main() -> None:
     host = os.environ.get("TRIPOFLUX_HOST", "127.0.0.1")
-    port = int(os.environ.get("TRIPOFLUX_PORT", "8000"))
+    port = int(os.environ.get("TRIPOFLUX_PORT", "8321"))
     uvicorn.run(app, host=host, port=port)
 
 

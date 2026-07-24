@@ -41,6 +41,9 @@ ckpts/
 .pytest_cache/
 *.png
 !frontend/*.png
+frontend/node_modules/
+frontend/dist/
+*.tsbuildinfo
 
 # HuggingFace cache
 .cache/
