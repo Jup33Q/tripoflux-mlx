@@ -10,6 +10,10 @@
 
 MLX / CoreML accelerated pipeline for **FLUX.2-klein-9B → BiRefNet → TripoSplat** on Apple Silicon.
 
+## Demo
+
+📺 [Bilibili video: Looking Glass (LKG) WebXR holographic preview demo](https://www.bilibili.com/video/BV1bFge6qEK2)
+
 ```text
 prompt ──► FLUX.2-klein-9B (MLX) ──► RGB image
                                         │
