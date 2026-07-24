@@ -22,29 +22,35 @@ class DA2BackgroundRemover:
 
     def __init__(
         self,
-        model_name: str = "depth-anything/Depth-Anything-V2-Base",
+        model_name: str = "depth-anything/Depth-Anything-V2-Base-hf",
         device: str = "mps",
         foreground_percentile: float = 30.0,
         use_coreml: bool = False,
         coreml_path: Optional[Union[str, Path]] = None,
+        local_files_only: bool = False,
     ):
         """
         Args:
-            model_name: HuggingFace model ID for PyTorch backend. Options:
-                - depth-anything/Depth-Anything-V2-Small
-                - depth-anything/Depth-Anything-V2-Base
-                - depth-anything/Depth-Anything-V2-Large
+            model_name: HuggingFace model ID for PyTorch backend. Must be a
+                transformers-compatible repo (the ``-hf`` variants carry a
+                config.json; the plain repos are raw checkpoints). Options:
+                - depth-anything/Depth-Anything-V2-Small-hf
+                - depth-anything/Depth-Anything-V2-Base-hf
+                - depth-anything/Depth-Anything-V2-Large-hf
             device: PyTorch device (mps, cpu, cuda).
             foreground_percentile: Depth percentile threshold for foreground.
             use_coreml: Use CoreML backend instead of PyTorch.
             coreml_path: Path to a local .mlpackage file. If None and
                 use_coreml=True, downloads apple/coreml-depth-anything-v2-small.
+            local_files_only: Only use the local HF cache; fail fast instead
+                of retrying the hub when offline.
         """
         self.model_name = model_name
         self.device = torch.device(device)
         self.foreground_percentile = foreground_percentile
         self.use_coreml = use_coreml
         self.coreml_path = Path(coreml_path) if coreml_path else None
+        self.local_files_only = local_files_only
         self._pipe = None
         self._coreml_model = None
 
@@ -63,6 +69,7 @@ class DA2BackgroundRemover:
                 task="depth-estimation",
                 model=self.model_name,
                 device=self.device,
+                local_files_only=self.local_files_only,
             )
             logger.info("Loaded DA2 PyTorch model: %s", self.model_name)
             return self._pipe
@@ -81,7 +88,10 @@ class DA2BackgroundRemover:
             else:
                 from huggingface_hub import snapshot_download
 
-                model_path = snapshot_download("apple/coreml-depth-anything-v2-small")
+                model_path = snapshot_download(
+                    "apple/coreml-depth-anything-v2-small",
+                    local_files_only=self.local_files_only,
+                )
                 mlpackage = list(Path(model_path).glob("*.mlpackage"))[0]
 
             self._coreml_model = ct.models.MLModel(str(mlpackage))
@@ -147,7 +157,7 @@ class DA2BackgroundRemover:
 
 
 def create_da2_remover(
-    model_name: str = "depth-anything/Depth-Anything-V2-Base",
+    model_name: str = "depth-anything/Depth-Anything-V2-Base-hf",
     device: str = "mps",
     foreground_percentile: float = 30.0,
     use_coreml: bool = False,

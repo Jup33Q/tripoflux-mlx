@@ -24,10 +24,12 @@ class SAM3BackgroundRemover:
         model_path: Optional[Union[str, Path]] = None,
         score_threshold: float = 0.3,
         text_prompt: str = "object",
+        local_files_only: bool = False,
     ):
         self.model_path = model_path or "mlx-community/sam3-8bit"
         self.score_threshold = score_threshold
         self.text_prompt = text_prompt
+        self.local_files_only = local_files_only
         self._predictor = None
 
     def _load(self):
@@ -38,7 +40,16 @@ class SAM3BackgroundRemover:
             from mlx_vlm.models.sam3.generate import Sam3Predictor
             from mlx_vlm.models.sam3.processing_sam3 import Sam3Processor
 
-            path = get_model_path(self.model_path)
+            model_path = self.model_path
+            if self.local_files_only and not Path(str(model_path)).expanduser().exists():
+                # Offline: resolve the repo id against the local HF cache only.
+                # Raises immediately when the cached snapshot is incomplete
+                # instead of retrying the hub for minutes.
+                from huggingface_hub import snapshot_download
+
+                model_path = snapshot_download(str(model_path), local_files_only=True)
+
+            path = get_model_path(model_path)
             model = load_model(path)
             processor = Sam3Processor.from_pretrained(str(path))
             self._predictor = Sam3Predictor(model, processor, score_threshold=self.score_threshold)
@@ -48,11 +59,15 @@ class SAM3BackgroundRemover:
             logger.warning("SAM3 load failed: %s", exc)
             return None
 
-    def remove_background(self, image: Image.Image, erode_radius: int = 1) -> Image.Image:
+    def remove_background(self, image: Image.Image, erode_radius: int = 1, text_prompt: Optional[str] = None) -> Image.Image:
         """Remove background and return an RGBA image.
 
         Uses SAM3 to segment the most salient object, then converts the
         binary mask into a soft alpha matte via distance transform.
+
+        ``text_prompt`` overrides the default open-vocabulary prompt; pass the
+        generation prompt's subject (e.g. "a tree", "a building") so SAM3
+        segments the intended subject instead of whatever looks salient.
         """
         if image.mode != "RGB":
             image = image.convert("RGB")
@@ -61,8 +76,9 @@ class SAM3BackgroundRemover:
         if predictor is None:
             raise RuntimeError("SAM3 is not available")
 
-        result = predictor.predict(image, text_prompt=self.text_prompt)
-        if not result.masks or len(result.masks) == 0:
+        result = predictor.predict(image, text_prompt=text_prompt or self.text_prompt)
+        masks = result.masks
+        if masks is None or len(masks) == 0:
             logger.warning("SAM3 found no objects, returning original image")
             rgba = image.copy()
             rgba.putalpha(Image.new("L", image.size, 255))
@@ -70,7 +86,7 @@ class SAM3BackgroundRemover:
 
         # Pick the highest-score mask
         best_idx = int(np.argmax(result.scores))
-        mask = result.masks[best_idx]  # (H, W) binary or float
+        mask = masks[best_idx]  # (H, W) binary or float
 
         # Convert binary mask to soft alpha matte using distance transform
         mask_np = np.array(mask, dtype=np.float32)

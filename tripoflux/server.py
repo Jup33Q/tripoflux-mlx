@@ -276,7 +276,7 @@ async def stream(job_id: str) -> StreamingResponse:
                 emit({"status": "running", "stage": "birefnet", "stage_progress": 0.0,
                       "progress": STAGE_SPAN["birefnet"][0],
                       "log": "Removing background with BiRefNet..."})
-                rgba = pipeline.remove_background(image, progress=on_progress)
+                rgba = pipeline.remove_background(image, prompt=req["prompt"], progress=on_progress)
                 job["rgba_image"] = rgba
                 emit({"status": "running", "stage": "birefnet", "stage_progress": 1.0,
                       "progress": STAGE_SPAN["birefnet"][1], "log": "Background removed",

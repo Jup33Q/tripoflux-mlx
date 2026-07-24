@@ -119,10 +119,11 @@ class TripoFluxPipeline:
     def remove_background(
         self,
         image: Image.Image,
+        prompt: Optional[str] = None,
         progress: Optional[ProgressCallback] = None,
     ) -> Image.Image:
         self._progress(progress, "birefnet", 0.05)
-        rgba = self.birefnet.remove_background(image)
+        rgba = self.birefnet.remove_background(image, prompt=prompt)
         self._progress(progress, "birefnet", 1.0)
         return rgba
 
@@ -175,7 +176,7 @@ class TripoFluxPipeline:
         )
 
         self._progress(progress, "birefnet", 0.0)
-        rgba = self.remove_background(image, progress=progress)
+        rgba = self.remove_background(image, prompt=prompt, progress=progress)
 
         self._progress(progress, "triposplat", 0.0)
         ply, splat, spz, prepared = self.generate_splat(

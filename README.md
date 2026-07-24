@@ -29,7 +29,7 @@ prompt ──► FLUX.2-klein-9B (MLX) ──► RGB image
 ## Features
 
 - **MLX-first** image generation with `mflux` / `FLUX.2-klein-9B`.
-- **Background removal** via BiRefNet / SAM3 / DA2, preferring MLX, falling back to CoreML or PyTorch MPS.
+- **Background removal** via SAM3 / DA2 / BiRefNet, preferring MLX, falling back to CoreML or PyTorch MPS. SAM3 segments by the generation prompt's subject (open-vocabulary), so large subjects like buildings and trees are kept instead of being saliency-cut as background. Hub-backed removers fail fast to local caches when offline.
 - **3D Gaussian Splatting** via the official [TripoSplat](https://github.com/VAST-AI-Research/TripoSplat) model.
 - **R3F web UI**: React Three Fiber splat viewport with OrbitControls, inline generation progress, log terminal, and **Looking Glass (LKG) holographic preview** via `@lookingglass/webxr` (WASD orbits, arrow keys dolly).
 - **Smooth model transitions**: the viewport lerp/slerp-morphs from the current model to each newly generated splat.

@@ -7,8 +7,11 @@ MLX implementation (SAM3 or DA2), falling back to CoreML and then PyTorch MPS.
 from __future__ import annotations
 
 import logging
+import os
+import socket
 from pathlib import Path
 from typing import Optional, Union
+from urllib.parse import urlparse
 
 from PIL import Image
 
@@ -17,6 +20,34 @@ from .birefnet_da2 import DA2BackgroundRemover
 from .birefnet_sam3 import SAM3BackgroundRemover
 
 logger = logging.getLogger(__name__)
+
+
+def _hub_available(timeout: float = 2.0) -> bool:
+    """Quick reachability probe for the HF hub (or HF_ENDPOINT mirror).
+
+    When the hub is unreachable, hub-backed model loads would otherwise burn
+    minutes in connection retries before falling back to the local cache.
+    Uses httpx first so proxy env vars are honored (a raw socket bypasses
+    HTTP proxies and reports false negatives); falls back to a TCP probe.
+    """
+    endpoint = os.environ.get("HF_ENDPOINT", "https://huggingface.co")
+    try:
+        import httpx
+
+        try:
+            with httpx.Client(timeout=timeout, follow_redirects=True) as client:
+                client.head(endpoint)
+            return True
+        except httpx.HTTPError:
+            pass
+    except ImportError:
+        pass
+    host = urlparse(endpoint).hostname or "huggingface.co"
+    try:
+        with socket.create_connection((host, 443), timeout=timeout):
+            return True
+    except OSError:
+        return False
 
 
 class BiRefNetMLX:
@@ -58,7 +89,7 @@ class BiRefNetMLX:
         if backend in ("mlx", "da2"):
             try:
                 self._da2 = DA2BackgroundRemover(
-                    model_name=da2_model or "depth-anything/Depth-Anything-V2-Base",
+                    model_name=da2_model or "depth-anything/Depth-Anything-V2-Base-hf",
                     device=device,
                     use_coreml=da2_coreml,
                 )
@@ -67,11 +98,39 @@ class BiRefNetMLX:
                 logger.warning("DA2 init failed, will use fallback: %s", exc)
                 self._da2 = None
 
-    def remove_background(self, image: Image.Image) -> Image.Image:
-        """Remove the background and return an RGBA image."""
+    @staticmethod
+    def _subject_prompt(prompt: Optional[str]) -> Optional[str]:
+        """Extract a short subject phrase for SAM3 from a generation prompt.
+
+        SAM3's open-vocabulary detection works best with a short noun phrase,
+        so use the first comma-separated clause ("a tree, low-poly style" →
+        "a tree").
+        """
+        if not prompt:
+            return None
+        subject = prompt.split(",")[0].strip()
+        return subject or None
+
+    def remove_background(self, image: Image.Image, prompt: Optional[str] = None) -> Image.Image:
+        """Remove the background and return an RGBA image.
+
+        ``prompt`` is the generation prompt; its subject clause is forwarded
+        to SAM3 so prompt-aware segmentation keeps the intended subject
+        (buildings, trees, ...) instead of whatever looks salient.
+        """
+        if not _hub_available():
+            # Offline: restrict hub-backed removers to the local cache so a
+            # missing/incomplete snapshot fails in milliseconds instead of
+            # retrying the network for minutes.
+            if self._sam3 is not None:
+                self._sam3.local_files_only = True
+            if self._da2 is not None:
+                self._da2.local_files_only = True
         if self.backend == "mlx" and self._sam3 is not None:
             try:
-                return self._sam3.remove_background(image)
+                return self._sam3.remove_background(
+                    image, text_prompt=self._subject_prompt(prompt)
+                )
             except Exception as exc:
                 logger.warning("SAM3 inference failed, falling back: %s", exc)
         if self.backend in ("mlx", "da2") and self._da2 is not None:
