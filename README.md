@@ -5,12 +5,15 @@
 [![Platform: macOS Apple Silicon](https://img.shields.io/badge/platform-macOS%20Apple%20Silicon-lightgrey)](https://support.apple.com/en-us/HT211814)
 [![MLX](https://img.shields.io/badge/MLX-native-green)](https://github.com/ml-explore/mlx)
 [![HuggingFace](https://img.shields.io/badge/%F0%9F%A4%97%20HuggingFace-Models-blue)](https://huggingface.co/Jup33QE/tripoflux-mlx)
+[![ModelScope](https://img.shields.io/badge/ModelScope-Models-purple)](https://modelscope.cn/models/Jup33Q/TripoSplat-MLX)
 [![GitHub stars](https://img.shields.io/github/stars/Jup33Q/tripoflux-mlx?style=social)](https://github.com/Jup33Q/tripoflux-mlx)
 [![GitHub issues](https://img.shields.io/github/issues/Jup33Q/tripoflux-mlx)](https://github.com/Jup33Q/tripoflux-mlx/issues)
 
 MLX / CoreML accelerated pipeline for **FLUX.2-klein-9B → BiRefNet → TripoSplat** on Apple Silicon.
 
 ## Demo
+
+[![LKG WebXR holographic preview demo](docs/demo-cover.png)](https://www.bilibili.com/video/BV1bFge6qEK2)
 
 📺 [Bilibili video: Looking Glass (LKG) WebXR holographic preview demo](https://www.bilibili.com/video/BV1bFge6qEK2)
 
@@ -101,6 +104,7 @@ pip install "mflux @ git+https://github.com/Jup33Q/mflux.git@main"
 #       - vae/triposplat_vae_decoder_fp16.safetensors
 #       - vae/flux2-vae.safetensors
 #       - background_removal/birefnet.safetensors
+#       (also mirrored on ModelScope: https://modelscope.cn/models/Jup33Q/TripoSplat-MLX)
 #    b) FLUX.2-klein-9B is fetched automatically by mflux on first use.
 #    c) (Optional) DA2 CoreML models from HuggingFace:
 #       - da2_base.mlpackage

@@ -41,6 +41,7 @@ ckpts/
 .pytest_cache/
 *.png
 !frontend/*.png
+!docs/*.png
 frontend/node_modules/
 frontend/dist/
 *.tsbuildinfo
