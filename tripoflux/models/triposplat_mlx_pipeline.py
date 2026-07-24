@@ -230,8 +230,16 @@ class TripoSplatHybridPipeline:
             if 'camera' in latent:
                 latent_torch['camera'] = torch.from_numpy(np.array(latent['camera'])).to(self.device)
             gaussian = self._torch_pipeline.decode_latent(latent_torch['latent'], num_gaussians=cfg.num_gaussians)
-            from .spz_utils import gaussian_to_spz_bytes
-            return gaussian.to_ply_bytes(), gaussian.to_splat_bytes(), gaussian_to_spz_bytes(gaussian), prepared
+            # SPZ is the canonical artifact: the preview splat and the ply
+            # are derived from it, so what the viewport renders matches the
+            # SPZ download exactly.
+            from .spz_utils import (
+                gaussian_to_spz_bytes,
+                spz_bytes_to_ply_bytes,
+                spz_bytes_to_splat_bytes,
+            )
+            spz_bytes = gaussian_to_spz_bytes(gaussian)
+            return spz_bytes_to_ply_bytes(spz_bytes), spz_bytes_to_splat_bytes(spz_bytes), spz_bytes, prepared
 
         gaussian, prepared = self._torch_pipeline.run(
             image,
@@ -244,8 +252,13 @@ class TripoSplatHybridPipeline:
             show_progress=show_progress,
             callback=callback,
         )
-        from .spz_utils import gaussian_to_spz_bytes
-        return gaussian.to_ply_bytes(), gaussian.to_splat_bytes(), gaussian_to_spz_bytes(gaussian), prepared
+        from .spz_utils import (
+            gaussian_to_spz_bytes,
+            spz_bytes_to_ply_bytes,
+            spz_bytes_to_splat_bytes,
+        )
+        spz_bytes = gaussian_to_spz_bytes(gaussian)
+        return spz_bytes_to_ply_bytes(spz_bytes), spz_bytes_to_splat_bytes(spz_bytes), spz_bytes, prepared
 
 
 def create_hybrid_pipeline(

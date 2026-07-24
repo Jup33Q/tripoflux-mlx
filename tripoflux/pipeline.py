@@ -9,6 +9,7 @@ from typing import Callable, Optional, Tuple, Union
 
 from PIL import Image
 
+from .mem_utils import release_gpu_caches
 from .models.birefnet_mlx import BiRefNetMLX
 from .models.flux_klein_mlx import FluxGenerationConfig, FluxKleinGenerator
 from .models.triposplat_wrapped import SplatGenerationConfig, TripoSplatGenerator
@@ -89,30 +90,39 @@ class TripoFluxPipeline:
     ) -> Image.Image:
         self._progress(progress, "flux", 0.0)
         flux = self.flux
+        temp_flux = None
         # If the caller requests a different quantization level, build a
         # temporary generator for this call. Model weights are reloaded
         # by mflux, so this is expensive and should be used sparingly.
         if flux_quantize is not None and flux_quantize != self.cfg.flux_quantize:
-            flux = FluxKleinGenerator(
+            temp_flux = FluxKleinGenerator(
                 backend=self.cfg.flux_backend,
                 quantize=flux_quantize,
             )
+            flux = temp_flux
 
         def on_step(step: int, total: int) -> None:
             self._progress(progress, "flux", step / total if total else 0.0)
 
-        img = flux.generate(
-            FluxGenerationConfig(
-                prompt=prompt,
-                width=width or self.cfg.image_width,
-                height=height or self.cfg.image_height,
-                num_inference_steps=self.cfg.flux_steps,
-                guidance_scale=self.cfg.flux_guidance,
-                seed=seed if seed is not None else self.cfg.seed,
-                negative_prompt=negative_prompt,
-            ),
-            step_callback=on_step if progress is not None else None,
-        )
+        try:
+            img = flux.generate(
+                FluxGenerationConfig(
+                    prompt=prompt,
+                    width=width or self.cfg.image_width,
+                    height=height or self.cfg.image_height,
+                    num_inference_steps=self.cfg.flux_steps,
+                    guidance_scale=self.cfg.flux_guidance,
+                    seed=seed if seed is not None else self.cfg.seed,
+                    negative_prompt=negative_prompt,
+                ),
+                step_callback=on_step if progress is not None else None,
+            )
+        finally:
+            if temp_flux is not None:
+                # The temporary quantize variant holds a second copy of the
+                # FLUX weights — dispose of it right after use.
+                temp_flux.unload()
+                release_gpu_caches()
         self._progress(progress, "flux", 1.0)
         return img
 

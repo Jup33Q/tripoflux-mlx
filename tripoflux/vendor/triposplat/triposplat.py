@@ -155,8 +155,14 @@ class Gaussian:
             transform = self._DEFAULT_TRANSFORM
         xyz, normals, f_dc, opacities, scale, rotation = self._get_ply_data(transform=transform)
         dtype_full = [(attr, 'f4') for attr in self.construct_list_of_attributes()]
+        # Also write uchar red/green/blue vertex colors so generic PLY viewers
+        # (MeshLab, Blender, CloudCompare) show color without having to
+        # interpret the SH f_dc coefficients.
+        dtype_full += [('red', 'u1'), ('green', 'u1'), ('blue', 'u1')]
+        C0 = 0.28209479177387814
+        rgb = (np.clip(f_dc * C0 + 0.5, 0, 1) * 255).round().astype(np.uint8)
         elements = np.empty(xyz.shape[0], dtype=dtype_full)
-        elements[:] = list(map(tuple, np.concatenate((xyz, normals, f_dc, opacities, scale, rotation), axis=1)))
+        elements[:] = list(map(tuple, np.concatenate((xyz, normals, f_dc, opacities, scale, rotation, rgb), axis=1)))
         return _binary_ply_bytes(elements, dtype_full)
 
     def to_splat_bytes(self, transform=None) -> bytes:

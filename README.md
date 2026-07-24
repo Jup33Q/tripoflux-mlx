@@ -39,6 +39,7 @@ prompt ──► FLUX.2-klein-9B (MLX) ──► RGB image
   - ✅ `LatentSeqMMFlowModel` flow transformer (`tripoflux/models/flow_mlx.py`)
   - ⏳ `OctreeGaussianDecoder` (remains on PyTorch MPS; complex dynamic sampling)
 - **DA2 CoreML** models for fast depth-based background removal (base + large).
+- **Memory hygiene**: all jobs run on a single worker thread (MLX streams are thread-local), GPU allocator caches are released between jobs, temporary quantize variants of FLUX are disposed immediately after use, the ~34 GB diffusers fallback is unloaded once mflux is healthy again, and old job results are LRU-evicted (keep last 8).
 
 ## TODO
 
@@ -51,7 +52,7 @@ prompt ──► FLUX.2-klein-9B (MLX) ──► RGB image
 - [x] R3F web UI: splat viewer + OrbitControls, inline progress, terminal
 - [x] Looking Glass WebXR preview (LKG quilt) with keyboard orbit/dolly
 - [x] Splat-to-splat lerp/slerp morph transitions
-- [x] SPZ export support (Niantic compressed splat format)
+- [x] SPZ as the canonical splat artifact — viewport preview, `.ply` and `.splat` exports are all derived from it (WYSIWYG with the SPZ download)
 - [x] SAM3 background removal via mlx-vlm
 - [x] DA2 CoreML background removal (base + large)
 - [x] mflux PR #481: Support mlx 0.32.x

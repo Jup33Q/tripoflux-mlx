@@ -76,16 +76,28 @@ class SAM3BackgroundRemover:
         if predictor is None:
             raise RuntimeError("SAM3 is not available")
 
-        result = predictor.predict(image, text_prompt=text_prompt or self.text_prompt)
-        masks = result.masks
-        if masks is None or len(masks) == 0:
-            logger.warning("SAM3 found no objects, returning original image")
-            rgba = image.copy()
-            rgba.putalpha(Image.new("L", image.size, 255))
-            return rgba
+        # Try the subject phrase first, then generic concepts. Stylized
+        # illustrations and scene-heavy prompts often miss open-vocab
+        # detection entirely, while "character"/"object" still hit.
+        prompts = [text_prompt or self.text_prompt]
+        prompts += [p for p in ("character", "person", "object") if p not in prompts]
+
+        masks = scores = None
+        used = prompts[0]
+        for p in prompts:
+            result = predictor.predict(image, text_prompt=p)
+            if result.masks is not None and len(result.masks) > 0:
+                masks, scores, used = result.masks, result.scores, p
+                break
+        if masks is None:
+            # Raise (instead of returning the opaque original) so the router
+            # falls through to DA2 / BiRefNet.
+            raise RuntimeError("SAM3 found no objects")
+        if used != prompts[0]:
+            logger.info("SAM3 subject %r found nothing; used fallback prompt %r", prompts[0], used)
 
         # Pick the highest-score mask
-        best_idx = int(np.argmax(result.scores))
+        best_idx = int(np.argmax(scores))
         mask = masks[best_idx]  # (H, W) binary or float
 
         # Convert binary mask to soft alpha matte using distance transform

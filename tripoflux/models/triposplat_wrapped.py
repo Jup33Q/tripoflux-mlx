@@ -116,10 +116,16 @@ class TripoSplatGenerator:
                 show_progress=show_progress,
                 callback=callback,
             )
-            ply_bytes = gaussian.to_ply_bytes()
-            splat_bytes = gaussian.to_splat_bytes()
-            from .spz_utils import gaussian_to_spz_bytes
+            # SPZ is the canonical artifact; ply/splat are derived from it
+            # (see the mlx path in TripoSplatHybridPipeline).
+            from .spz_utils import (
+                gaussian_to_spz_bytes,
+                spz_bytes_to_ply_bytes,
+                spz_bytes_to_splat_bytes,
+            )
             spz_bytes = gaussian_to_spz_bytes(gaussian)
+            ply_bytes = spz_bytes_to_ply_bytes(spz_bytes)
+            splat_bytes = spz_bytes_to_splat_bytes(spz_bytes)
         return ply_bytes, splat_bytes, spz_bytes, prepared
 
     def save_splat(

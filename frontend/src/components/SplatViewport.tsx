@@ -397,6 +397,8 @@ export default function SplatViewport({ splatUrl }: SplatViewportProps) {
   return (
     <div className="splat-viewport">
       <Canvas
+        flat // NoToneMapping: splat vertex colors are already final sRGB;
+             // R3F's default ACES tone mapping would shift them like lighting.
         gl={{ antialias: true }}
         camera={{ fov: 60, near: 0.01, far: 100, position: [0, 0, 3] }}
         onCreated={({ gl }) => {

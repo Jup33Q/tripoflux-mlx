@@ -8,10 +8,11 @@ import io
 import json
 import logging
 import os
+import queue
 import threading
 import uuid
 from pathlib import Path
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator, Callable, Optional
 
 import uvicorn
 from fastapi import FastAPI, HTTPException
@@ -19,6 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
+from .mem_utils import release_gpu_caches
 from .pipeline import PipelineConfig, TripoFluxPipeline
 
 logger = logging.getLogger(__name__)
@@ -36,7 +38,52 @@ app.add_middleware(
 # In-memory job store: {job_id: {"status": ..., "result": ...}}
 _jobs: dict[str, dict] = {}
 
+# Keep only the most recent jobs: each result holds ply/splat/spz bytes plus
+# three PIL images (~40 MB), so an unbounded job store leaks into swap.
+_MAX_JOBS = 8
+
+
+def _evict_old_jobs() -> None:
+    """Delete the oldest finished jobs beyond _MAX_JOBS.
+
+    Running/queued jobs are never touched. Evicted jobs disappear entirely,
+    so their status/result endpoints start returning 404.
+    """
+    excess = len(_jobs) - _MAX_JOBS
+    if excess <= 0:
+        return
+    finished = [jid for jid, job in _jobs.items() if job["status"] in ("completed", "failed")]
+    for jid in finished[:excess]:
+        logger.info("Evicting job %s results to free memory", jid[:8])
+        del _jobs[jid]
+
+
 _pipeline: Optional[TripoFluxPipeline] = None
+
+# All jobs run on ONE persistent worker thread. MLX streams are thread-local,
+# so a cached mflux model raises "There is no Stream(cpu, 1) in current
+# thread" when a later job reuses it from a fresh thread; a single worker
+# also serializes GPU work, which a single GPU cannot parallelize anyway.
+_job_queue: "queue.Queue[Callable[[], None]]" = queue.Queue()
+_worker_lock = threading.Lock()
+_worker_started = False
+
+
+def _job_worker() -> None:
+    while True:
+        fn = _job_queue.get()
+        try:
+            fn()
+        except Exception:  # pragma: no cover - safety net
+            logger.exception("job worker error")
+
+
+def _ensure_worker() -> None:
+    global _worker_started
+    with _worker_lock:
+        if not _worker_started:
+            threading.Thread(target=_job_worker, name="job-worker", daemon=True).start()
+            _worker_started = True
 
 
 class GenerateRequest(BaseModel):
@@ -106,6 +153,7 @@ async def generate(req: GenerateRequest) -> GenerateResponse:
         "request": req.model_dump(),
         "result": None,
     }
+    _evict_old_jobs()
     return GenerateResponse(job_id=job_id)
 
 
@@ -252,6 +300,7 @@ async def stream(job_id: str) -> StreamingResponse:
             })
 
         def run_job() -> None:
+            pipeline = None
             try:
                 pipeline = get_pipeline()
 
@@ -333,13 +382,19 @@ async def stream(job_id: str) -> StreamingResponse:
                 job["error"] = str(exc)
                 emit({"status": "failed", "error": str(exc), "log": f"Error: {exc}"})
             finally:
+                # Between-jobs memory hygiene (safe: the single worker means
+                # no other job is using the GPU right now).
+                release_gpu_caches()
+                if pipeline is not None and pipeline.flux.backend == "mlx":
+                    # Prefer mflux; drop the ~34 GB diffusers fallback if a
+                    # past mflux failure loaded it.
+                    pipeline.flux.unload_diffusers()
                 loop.call_soon_threadsafe(queue.put_nowait, _DONE)
-
-        worker = threading.Thread(target=run_job, name=f"job-{job_id[:8]}", daemon=True)
 
         # Send immediate started event so the frontend knows the stream is alive.
         yield f"data: {json.dumps({'status': 'running', 'progress': 0.0, 'stage': 'starting', 'log': 'Job started'})}\n\n"
-        worker.start()
+        _ensure_worker()
+        _job_queue.put(run_job)
 
         while True:
             item = await queue.get()

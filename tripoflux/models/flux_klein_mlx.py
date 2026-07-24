@@ -198,6 +198,25 @@ class FluxKleinGenerator:
             return None
 
     # ------------------------------------------------------------------
+    # Memory management
+    # ------------------------------------------------------------------
+    def unload(self) -> None:
+        """Drop every loaded model (used for temporary per-call generators)."""
+        self._mflux_model = None
+        self._mflux_step_cb = None
+        self._diffusers_pipe = None
+
+    def unload_diffusers(self) -> None:
+        """Drop the diffusers fallback pipeline (~34 GB) if it was loaded.
+
+        Only meaningful when the primary backend is mlx: a future mflux
+        failure would simply reload it.
+        """
+        if self._diffusers_pipe is not None:
+            logger.info("Unloading diffusers fallback pipeline to free memory")
+            self._diffusers_pipe = None
+
+    # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
     def generate(
